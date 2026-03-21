@@ -2,13 +2,14 @@
 # app/routes/lost_found.py  —  /api/mobile/lost-found
 # GET  /         — list (optional ?status=lost|found)
 # GET  /<id>     — single
-# POST /         — report
+# POST /         — report (supports base64 image)
 # PUT  /<id>     — update / resolve
 # =============================================================================
 
 from datetime import date
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from sqlalchemy.exc import DataError, OperationalError
 from .. import db
 from ..models.models import LostFound
 
@@ -37,20 +38,40 @@ def get_item(item_id):
 @jwt_required()
 def report():
     student_id = int(get_jwt_identity())
-    data       = request.get_json(silent=True) or {}
+    data       = request.get_json(force=True, silent=True)
 
-    item = LostFound(
-        title       = data.get('title', ''),
-        description = data.get('description'),
-        location    = data.get('location', ''),
-        date        = date.fromisoformat(data.get('date', date.today().isoformat())),
-        status      = data.get('status', 'lost'),
-        reporter_id = student_id,
-        image_url   = data.get('image_url'),
-    )
-    db.session.add(item)
-    db.session.commit()
-    return jsonify(item.to_dict()), 201
+    if not data:
+        return jsonify({'message': 'Invalid or missing JSON body.'}), 400
+
+    try:
+        item = LostFound(
+            title       = data.get('title', '').strip(),
+            description = data.get('description', ''),
+            location    = data.get('location', ''),
+            date        = date.fromisoformat(
+                              data.get('date', date.today().isoformat())),
+            status      = data.get('status', 'lost'),
+            reporter_id = student_id,
+            image_url   = data.get('image_url'),
+        )
+        db.session.add(item)
+        db.session.commit()
+        return jsonify(item.to_dict()), 201
+
+    except DataError as e:
+        db.session.rollback()
+        return jsonify({
+            'message': 'Database error: image column too small. '
+                       'Run: ALTER TABLE lost_found MODIFY COLUMN image_url LONGTEXT;'
+        }), 500
+
+    except OperationalError as e:
+        db.session.rollback()
+        return jsonify({'message': f'Database error: {str(e)}'}), 500
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Unexpected error: {str(e)}'}), 500
 
 
 @lost_found_bp.route('/<int:item_id>', methods=['PUT'])
@@ -61,7 +82,7 @@ def update_item(item_id):
     if item.reporter_id != student_id:
         return jsonify({'message': 'Forbidden'}), 403
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(force=True, silent=True) or {}
     item.is_resolved = data.get('is_resolved', item.is_resolved)
     item.description = data.get('description', item.description)
     db.session.commit()
