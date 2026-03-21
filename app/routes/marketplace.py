@@ -1,14 +1,10 @@
 # =============================================================================
 # app/routes/marketplace.py  —  /api/mobile/marketplace
-# GET  /        — list all active listings (optional ?search=)
-# GET  /<id>    — single item
-# POST /        — create listing
-# PUT  /<id>    — update (seller only)
-# DELETE /<id>  — delete (seller only)
 # =============================================================================
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from sqlalchemy.exc import DataError, OperationalError
 from .. import db
 from ..models.models import MarketplaceItem
 
@@ -38,19 +34,39 @@ def get_item(item_id):
 @jwt_required()
 def create_item():
     student_id = int(get_jwt_identity())
-    data = request.get_json(silent=True) or {}
 
-    item = MarketplaceItem(
-        name        = data.get('name', ''),
-        description = data.get('description'),
-        condition_  = data.get('condition', 'Good condition'),
-        price       = float(data.get('price', 0)),
-        image_url   = data.get('image_url'),
-        seller_id   = student_id,
-    )
-    db.session.add(item)
-    db.session.commit()
-    return jsonify(item.to_dict()), 201
+    data = request.get_json(force=True, silent=True)
+    if not data:
+        return jsonify({'message': 'Invalid or missing JSON body.'}), 400
+
+    try:
+        item = MarketplaceItem(
+            name        = data.get('name', '').strip(),
+            description = data.get('description', ''),
+            condition_  = data.get('condition', 'Good condition'),
+            price       = float(data.get('price', 0)),
+            image_url   = data.get('image_url'),
+            seller_id   = student_id,
+        )
+        db.session.add(item)
+        db.session.commit()
+        return jsonify(item.to_dict()), 201
+
+    except DataError as e:
+        db.session.rollback()
+        # Most likely image_url column is still VARCHAR — needs migration
+        return jsonify({
+            'message': 'Database error: image column too small. '
+                       'Run: ALTER TABLE marketplace_items MODIFY COLUMN image_url LONGTEXT;'
+        }), 500
+
+    except OperationalError as e:
+        db.session.rollback()
+        return jsonify({'message': f'Database connection error: {str(e)}'}), 500
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Unexpected error: {str(e)}'}), 500
 
 
 @marketplace_bp.route('/<int:item_id>', methods=['PUT'])
@@ -61,7 +77,7 @@ def update_item(item_id):
     if item.seller_id != student_id:
         return jsonify({'message': 'Forbidden'}), 403
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(force=True, silent=True) or {}
     item.name       = data.get('name',      item.name)
     item.condition_ = data.get('condition', item.condition_)
     item.price      = float(data.get('price', item.price))

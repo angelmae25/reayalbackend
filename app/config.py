@@ -33,3 +33,6 @@ class Config:
     # ── General ───────────────────────────────────────────────────────────────
     DEBUG = True
     TESTING = False
+
+    # ── Allow large JSON bodies for base64 image uploads (10 MB) ─────────────
+    MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10 MB

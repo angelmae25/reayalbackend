@@ -2,7 +2,7 @@
 # app/__init__.py  —  Flask application factory
 # =============================================================================
 
-from flask import Flask
+from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
@@ -24,16 +24,25 @@ def create_app(config_class=Config):
     jwt.init_app(app)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+    # ── Global error handlers (must be on app, not blueprint) ─────────────────
+    @app.errorhandler(413)
+    def too_large(e):
+        return jsonify({'message': 'Image is too large. Please use a smaller photo (max 10 MB).'}), 413
+
+    @app.errorhandler(400)
+    def bad_request(e):
+        return jsonify({'message': 'Bad request. Please check your input.'}), 400
+
     # ── Blueprints ────────────────────────────────────────────────────────────
-    from .routes.auth       import auth_bp
-    from .routes.news       import news_bp
-    from .routes.events     import events_bp
-    from .routes.clubs      import clubs_bp
+    from .routes.auth        import auth_bp
+    from .routes.news        import news_bp
+    from .routes.events      import events_bp
+    from .routes.clubs       import clubs_bp
     from .routes.marketplace import marketplace_bp
-    from .routes.lost_found import lost_found_bp
-    from .routes.chat       import chat_bp
+    from .routes.lost_found  import lost_found_bp
+    from .routes.chat        import chat_bp
     from .routes.leaderboard import leaderboard_bp
-    from .routes.students   import students_bp
+    from .routes.students    import students_bp
 
     app.register_blueprint(auth_bp,        url_prefix='/api/mobile/auth')
     app.register_blueprint(news_bp,        url_prefix='/api/mobile/news')

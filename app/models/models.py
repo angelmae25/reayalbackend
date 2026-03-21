@@ -28,9 +28,9 @@ class Student(db.Model):
     updated_at    = db.Column(db.DateTime,    default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # relationships
-    marketplace_items = db.relationship('MarketplaceItem', backref='seller',    lazy=True)
-    lost_found_items  = db.relationship('LostFound',       backref='reporter',  lazy=True)
-    sent_messages     = db.relationship('Message',         backref='sender',    lazy=True)
+    marketplace_items = db.relationship('MarketplaceItem', backref='seller',   lazy=True)
+    lost_found_items  = db.relationship('LostFound',       backref='reporter', lazy=True)
+    sent_messages     = db.relationship('Message',         backref='sender',   lazy=True)
 
     @property
     def full_name(self):
@@ -48,7 +48,7 @@ class Student(db.Model):
             'avatar_url': self.avatar_url,
             'points':     self.points,
             'status':     self.status,
-            'rank':       rank or 0,
+            'rank':        rank or 0,
             'club_count': len(self.memberships),
             'post_count': 0,
         }
@@ -122,9 +122,10 @@ club_memberships = db.Table(
     db.Column('joined_at',  db.DateTime, default=datetime.utcnow),
 )
 
-# Add memberships backref to Student
-Student.memberships = db.relationship('Club', secondary=club_memberships,
-                                      backref=db.backref('members', lazy='dynamic'))
+Student.memberships = db.relationship(
+    'Club', secondary=club_memberships,
+    backref=db.backref('members', lazy='dynamic')
+)
 
 
 class Club(db.Model):
@@ -141,20 +142,22 @@ class Club(db.Model):
 
     def to_dict(self, is_joined=False):
         return {
-            'id':          str(self.id),
-            'name':        self.name,
-            'acronym':     self.acronym,
-            'department':  self.department,
-            'description': self.description,
-            'icon_name':   self.icon_name,
-            'color':       self.color,
-            'is_joined':   is_joined,
+            'id':           str(self.id),
+            'name':         self.name,
+            'acronym':      self.acronym,
+            'department':   self.department,
+            'description':  self.description,
+            'icon_name':    self.icon_name,
+            'color':        self.color,
+            'is_joined':    is_joined,
             'member_count': self.members.count(),
         }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MARKETPLACE
+# NOTE: image_url is db.Text to support base64 data URIs
+# Run once in MySQL: ALTER TABLE marketplace_items MODIFY COLUMN image_url LONGTEXT;
 # ─────────────────────────────────────────────────────────────────────────────
 class MarketplaceItem(db.Model):
     __tablename__ = 'marketplace_items'
@@ -164,7 +167,7 @@ class MarketplaceItem(db.Model):
     description = db.Column(db.Text,          nullable=True)
     condition_  = db.Column('condition_', db.String(60), default='Good condition')
     price       = db.Column(db.Numeric(10,2), nullable=False, default=0)
-    image_url   = db.Column(db.String(300),   nullable=True)
+    image_url   = db.Column(db.Text,          nullable=True)
     seller_id   = db.Column(db.Integer, db.ForeignKey('students.id'), nullable=False)
     is_sold     = db.Column(db.Boolean,       default=False)
     posted_at   = db.Column(db.DateTime,      default=datetime.utcnow)
