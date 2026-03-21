@@ -21,7 +21,7 @@ class Student(db.Model):
     course        = db.Column(db.String(100), default='')
     year_level    = db.Column(db.String(30),  default='1st Year')
     contact       = db.Column(db.String(20),  nullable=True)
-    avatar_url    = db.Column(db.String(300), nullable=True)
+    avatar_url    = db.Column(db.Text,          nullable=True)  # base64 or URL
     points        = db.Column(db.Integer,     default=0)
     status        = db.Column(db.Enum('PENDING', 'ACTIVE', 'INACTIVE'), default='PENDING')
     created_at    = db.Column(db.DateTime,    default=datetime.utcnow)

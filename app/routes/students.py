@@ -1,11 +1,12 @@
 # =============================================================================
 # app/routes/students.py  —  /api/mobile/students
-# GET  /profile        — own profile
-# PUT  /profile        — update contact / avatar
+# GET  /profile  — own profile
+# PUT  /profile  — update contact / avatar / course / year_level
 # =============================================================================
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from sqlalchemy.exc import DataError
 from .. import db
 from ..models.models import Student
 
@@ -25,11 +26,30 @@ def get_profile():
 def update_profile():
     student_id = int(get_jwt_identity())
     student    = Student.query.get_or_404(student_id)
-    data       = request.get_json(silent=True) or {}
+    data       = request.get_json(force=True, silent=True) or {}
 
-    student.contact    = data.get('contact',    student.contact)
-    student.avatar_url = data.get('avatar_url', student.avatar_url)
-    student.course     = data.get('course',     student.course)
-    student.year_level = data.get('year_level', student.year_level)
-    db.session.commit()
-    return jsonify(student.to_dict()), 200
+    try:
+        # Only update fields that were actually sent
+        if 'contact' in data:
+            student.contact    = data['contact']
+        if 'course' in data:
+            student.course     = data['course']
+        if 'year_level' in data:
+            student.year_level = data['year_level']
+        if 'avatar_url' in data:
+            # empty string means remove avatar
+            student.avatar_url = data['avatar_url'] or None
+
+        db.session.commit()
+        return jsonify(student.to_dict()), 200
+
+    except DataError:
+        db.session.rollback()
+        return jsonify({
+            'message': 'Avatar too large. '
+                       'Run: ALTER TABLE students MODIFY COLUMN avatar_url LONGTEXT;'
+        }), 500
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Update failed: {str(e)}'}), 500
