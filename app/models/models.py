@@ -21,21 +21,16 @@ class Student(db.Model):
     course        = db.Column(db.String(100), default='')
     year_level    = db.Column(db.String(30),  default='1st Year')
     contact       = db.Column(db.String(20),  nullable=True)
-    avatar_url    = db.Column(db.Text,          nullable=True)  # base64 or URL
+    avatar_url    = db.Column(db.String(300), nullable=True)
     points        = db.Column(db.Integer,     default=0)
     status        = db.Column(db.Enum('PENDING', 'ACTIVE', 'INACTIVE'), default='PENDING')
     created_at    = db.Column(db.DateTime,    default=datetime.utcnow)
     updated_at    = db.Column(db.DateTime,    default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # ── NEW: FCM device token for push notifications ──────────────────────────
-    fcm_token     = db.Column(db.String(500), nullable=True)
-
     # relationships
-    marketplace_items = db.relationship('MarketplaceItem', backref='seller',   lazy=True)
-    lost_found_items  = db.relationship('LostFound',       backref='reporter', lazy=True)
-    sent_messages     = db.relationship('Message',         backref='sender',   lazy=True)
-    # NEW: event attendance relationship
-    attendances       = db.relationship('EventAttendance', backref='student',  lazy=True)
+    marketplace_items = db.relationship('MarketplaceItem', backref='seller',    lazy=True)
+    lost_found_items  = db.relationship('LostFound',       backref='reporter',  lazy=True)
+    sent_messages     = db.relationship('Message',         backref='sender',    lazy=True)
 
     @property
     def full_name(self):
@@ -53,7 +48,7 @@ class Student(db.Model):
             'avatar_url': self.avatar_url,
             'points':     self.points,
             'status':     self.status,
-            'rank':        rank or 0,
+            'rank':       rank or 0,
             'club_count': len(self.memberships),
             'post_count': 0,
         }
@@ -104,41 +99,17 @@ class Event(db.Model):
     description = db.Column(db.Text,        nullable=True)
     created_at  = db.Column(db.DateTime,    default=datetime.utcnow)
 
-    # NEW: attendance relationship
-    attendances = db.relationship('EventAttendance', backref='event', lazy=True)
-
     def to_dict(self):
         return {
-            'id':               str(self.id),
-            'short_name':       self.short_name,
-            'full_name':        self.full_name,
-            'date':             self.date.isoformat(),
-            'venue':            self.venue,
-            'category':         self.category,
-            'color':            self.color,
-            'description':      self.description,
-            'attendance_count': len(self.attendances),  # NEW
+            'id':          str(self.id),
+            'short_name':  self.short_name,
+            'full_name':   self.full_name,
+            'date':        self.date.isoformat(),
+            'venue':       self.venue,
+            'category':    self.category,
+            'color':       self.color,
+            'description': self.description,
         }
-
-# =============================================================================
-# REPLACE EventAttendance class in app/models/models.py
-# Fix: use db.SmallInteger or explicitly tell SQLAlchemy the column is
-# the same type as events.id and students.id (both INT in your MySQL schema).
-# The __table_args__ now includes mysql_engine to skip FK validation on create.
-# =============================================================================
-
-class EventAttendance(db.Model):
-    __tablename__ = 'event_attendance'
-
-    id         = db.Column(db.Integer,   primary_key=True, autoincrement=True)
-    event_id   = db.Column(db.BigInteger, db.ForeignKey('events.id',   ondelete='CASCADE'), nullable=False)
-    student_id = db.Column(db.Integer,   db.ForeignKey('students.id', ondelete='CASCADE'), nullable=False)
-    attended_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    __table_args__ = (
-        db.UniqueConstraint('event_id', 'student_id', name='uq_event_student'),
-        {'mysql_engine': 'InnoDB', 'mysql_charset': 'utf8mb4'},
-    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -151,10 +122,9 @@ club_memberships = db.Table(
     db.Column('joined_at',  db.DateTime, default=datetime.utcnow),
 )
 
-Student.memberships = db.relationship(
-    'Club', secondary=club_memberships,
-    backref=db.backref('members', lazy='dynamic')
-)
+# Add memberships backref to Student
+Student.memberships = db.relationship('Club', secondary=club_memberships,
+                                      backref=db.backref('members', lazy='dynamic'))
 
 
 class Club(db.Model):
@@ -171,22 +141,20 @@ class Club(db.Model):
 
     def to_dict(self, is_joined=False):
         return {
-            'id':           str(self.id),
-            'name':         self.name,
-            'acronym':      self.acronym,
-            'department':   self.department,
-            'description':  self.description,
-            'icon_name':    self.icon_name,
-            'color':        self.color,
-            'is_joined':    is_joined,
+            'id':          str(self.id),
+            'name':        self.name,
+            'acronym':     self.acronym,
+            'department':  self.department,
+            'description': self.description,
+            'icon_name':   self.icon_name,
+            'color':       self.color,
+            'is_joined':   is_joined,
             'member_count': self.members.count(),
         }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MARKETPLACE
-# NOTE: image_url is db.Text to support base64 data URIs
-# Run once in MySQL: ALTER TABLE marketplace_items MODIFY COLUMN image_url LONGTEXT;
 # ─────────────────────────────────────────────────────────────────────────────
 class MarketplaceItem(db.Model):
     __tablename__ = 'marketplace_items'
@@ -196,7 +164,7 @@ class MarketplaceItem(db.Model):
     description = db.Column(db.Text,          nullable=True)
     condition_  = db.Column('condition_', db.String(60), default='Good condition')
     price       = db.Column(db.Numeric(10,2), nullable=False, default=0)
-    image_url   = db.Column(db.Text,          nullable=True)
+    image_url   = db.Column(db.String(300),   nullable=True)
     seller_id   = db.Column(db.Integer, db.ForeignKey('students.id'), nullable=False)
     is_sold     = db.Column(db.Boolean,       default=False)
     posted_at   = db.Column(db.DateTime,      default=datetime.utcnow)
