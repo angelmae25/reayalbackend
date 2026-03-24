@@ -24,8 +24,6 @@ if __name__ == '__main__':
         db.create_all()
         print("✅  Database tables ready.")
 
-    app.run(
-        host='0.0.0.0',   # listen on all interfaces so emulator/device can reach it
-        port=5000,
-        debug=True,
-    )
+    from app import socketio
+
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)

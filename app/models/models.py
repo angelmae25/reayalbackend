@@ -27,10 +27,15 @@ class Student(db.Model):
     created_at    = db.Column(db.DateTime,    default=datetime.utcnow)
     updated_at    = db.Column(db.DateTime,    default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # ── NEW: FCM device token for push notifications ──────────────────────────
+    fcm_token     = db.Column(db.String(500), nullable=True)
+
     # relationships
     marketplace_items = db.relationship('MarketplaceItem', backref='seller',   lazy=True)
     lost_found_items  = db.relationship('LostFound',       backref='reporter', lazy=True)
     sent_messages     = db.relationship('Message',         backref='sender',   lazy=True)
+    # NEW: event attendance relationship
+    attendances       = db.relationship('EventAttendance', backref='student',  lazy=True)
 
     @property
     def full_name(self):
@@ -99,17 +104,41 @@ class Event(db.Model):
     description = db.Column(db.Text,        nullable=True)
     created_at  = db.Column(db.DateTime,    default=datetime.utcnow)
 
+    # NEW: attendance relationship
+    attendances = db.relationship('EventAttendance', backref='event', lazy=True)
+
     def to_dict(self):
         return {
-            'id':          str(self.id),
-            'short_name':  self.short_name,
-            'full_name':   self.full_name,
-            'date':        self.date.isoformat(),
-            'venue':       self.venue,
-            'category':    self.category,
-            'color':       self.color,
-            'description': self.description,
+            'id':               str(self.id),
+            'short_name':       self.short_name,
+            'full_name':        self.full_name,
+            'date':             self.date.isoformat(),
+            'venue':            self.venue,
+            'category':         self.category,
+            'color':            self.color,
+            'description':      self.description,
+            'attendance_count': len(self.attendances),  # NEW
         }
+
+# =============================================================================
+# REPLACE EventAttendance class in app/models/models.py
+# Fix: use db.SmallInteger or explicitly tell SQLAlchemy the column is
+# the same type as events.id and students.id (both INT in your MySQL schema).
+# The __table_args__ now includes mysql_engine to skip FK validation on create.
+# =============================================================================
+
+class EventAttendance(db.Model):
+    __tablename__ = 'event_attendance'
+
+    id         = db.Column(db.Integer,   primary_key=True, autoincrement=True)
+    event_id   = db.Column(db.BigInteger, db.ForeignKey('events.id',   ondelete='CASCADE'), nullable=False)
+    student_id = db.Column(db.Integer,   db.ForeignKey('students.id', ondelete='CASCADE'), nullable=False)
+    attended_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('event_id', 'student_id', name='uq_event_student'),
+        {'mysql_engine': 'InnoDB', 'mysql_charset': 'utf8mb4'},
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

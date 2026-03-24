@@ -94,6 +94,60 @@ def refresh():
     return jsonify({'access_token': access_token}), 200
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CHANGE PASSWORD  ← NEW
+# PUT /api/mobile/auth/change-password
+# Body: { "current_password": "...", "new_password": "..." }
+# ─────────────────────────────────────────────────────────────────────────────
+@auth_bp.route('/change-password', methods=['PUT'])
+@jwt_required()
+def change_password():
+    student_id = int(get_jwt_identity())
+    student    = Student.query.get_or_404(student_id)
+    data       = request.get_json(silent=True) or {}
+
+    current_pw = data.get('current_password', '').strip()
+    new_pw     = data.get('new_password', '').strip()
+
+    if not current_pw or not new_pw:
+        return jsonify({'message': 'Both current and new password are required.'}), 400
+
+    if not bcrypt.check_password_hash(student.password_hash, current_pw):
+        return jsonify({'message': 'Current password is incorrect.'}), 401
+
+    if len(new_pw) < 6:
+        return jsonify({'message': 'New password must be at least 6 characters.'}), 400
+
+    student.password_hash = bcrypt.generate_password_hash(new_pw).decode('utf-8')
+    db.session.commit()
+
+    return jsonify({'message': 'Password updated successfully.'}), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SAVE FCM TOKEN  ← NEW
+# POST /api/mobile/auth/fcm-token
+# Body: { "fcm_token": "..." }
+# Called by Flutter on app start after Firebase initializes.
+# Saves the device token so Flask can send push notifications.
+# ─────────────────────────────────────────────────────────────────────────────
+@auth_bp.route('/fcm-token', methods=['POST'])
+@jwt_required()
+def save_fcm_token():
+    student_id = int(get_jwt_identity())
+    student    = Student.query.get_or_404(student_id)
+    data       = request.get_json(silent=True) or {}
+
+    token = data.get('fcm_token', '').strip()
+    if not token:
+        return jsonify({'message': 'fcm_token is required.'}), 400
+
+    student.fcm_token = token
+    db.session.commit()
+
+    return jsonify({'message': 'FCM token saved.'}), 200
+
+
 @auth_bp.route('/admin/students', methods=['GET'])
 @jwt_required()
 def admin_students():

@@ -7,11 +7,13 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
+from flask_socketio import SocketIO          # ← NEW
 from .config import Config
 
-db      = SQLAlchemy()
-bcrypt  = Bcrypt()
-jwt     = JWTManager()
+db       = SQLAlchemy()
+bcrypt   = Bcrypt()
+jwt      = JWTManager()
+socketio = SocketIO(cors_allowed_origins="*", async_mode='eventlet')  # ← NEW
 
 
 def create_app(config_class=Config):
@@ -22,6 +24,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     bcrypt.init_app(app)
     jwt.init_app(app)
+    socketio.init_app(app)                   # ← NEW
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     # ── Global error handlers (must be on app, not blueprint) ─────────────────
@@ -43,6 +46,7 @@ def create_app(config_class=Config):
     from .routes.chat        import chat_bp
     from .routes.leaderboard import leaderboard_bp
     from .routes.students    import students_bp
+    from .routes.reports     import reports_bp   # ← NEW
 
     app.register_blueprint(auth_bp,        url_prefix='/api/mobile/auth')
     app.register_blueprint(news_bp,        url_prefix='/api/mobile/news')
@@ -53,6 +57,11 @@ def create_app(config_class=Config):
     app.register_blueprint(chat_bp,        url_prefix='/api/mobile/chat')
     app.register_blueprint(leaderboard_bp, url_prefix='/api/mobile/leaderboard')
     app.register_blueprint(students_bp,    url_prefix='/api/mobile/students')
+    app.register_blueprint(reports_bp,     url_prefix='/api/mobile/reports')  # ← NEW
+
+    # ── Register Socket.IO event handlers ─────────────────────────────────────
+    from .routes.chat_socket import register_socket_events  # ← NEW
+    register_socket_events(socketio)                        # ← NEW
 
     # ── Health check ──────────────────────────────────────────────────────────
     @app.route('/api/mobile/ping')
