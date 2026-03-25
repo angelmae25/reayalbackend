@@ -1,7 +1,7 @@
 # =============================================================================
 # app/routes/students.py  —  /api/mobile/students
 # GET  /profile  — own profile
-# PUT  /profile  — update contact / avatar / course / year_level
+# PUT  /profile  — update contact / avatar / course / year_level. hoy
 # =============================================================================
 
 from flask import Blueprint, request, jsonify
