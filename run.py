@@ -13,7 +13,7 @@
 # Physical device connects via:   http://<YOUR_PC_LAN_IP>:5000/api/mobile/...
 # =============================================================================
 
-from app import create_app, db
+from app import create_app, db, socketio   # ← FIX: import socketio here, not inside block
 
 app = create_app()
 
@@ -24,6 +24,4 @@ if __name__ == '__main__':
         db.create_all()
         print("✅  Database tables ready.")
 
-    from app import socketio
-
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)

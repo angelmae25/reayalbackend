@@ -7,27 +7,29 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
-from flask_socketio import SocketIO          # ← NEW
+from flask_socketio import SocketIO
 from .config import Config
 
+# ── Extensions ───────────────────────────────────────────────────────────────
 db       = SQLAlchemy()
 bcrypt   = Bcrypt()
 jwt      = JWTManager()
-socketio = SocketIO(cors_allowed_origins="*", async_mode='eventlet')  # ← NEW
+# SocketIO without specifying async_mode for compatibility with Python 3.14
+socketio = SocketIO(cors_allowed_origins="*")
 
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
-    # ── Extensions ────────────────────────────────────────────────────────────
+    # ── Initialize extensions ───────────────────────────────────────────────────
     db.init_app(app)
     bcrypt.init_app(app)
     jwt.init_app(app)
-    socketio.init_app(app)                   # ← NEW
+    socketio.init_app(app)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-    # ── Global error handlers (must be on app, not blueprint) ─────────────────
+    # ── Global error handlers ──────────────────────────────────────────────────
     @app.errorhandler(413)
     def too_large(e):
         return jsonify({'message': 'Image is too large. Please use a smaller photo (max 10 MB).'}), 413
@@ -46,7 +48,7 @@ def create_app(config_class=Config):
     from .routes.chat        import chat_bp
     from .routes.leaderboard import leaderboard_bp
     from .routes.students    import students_bp
-    from .routes.reports     import reports_bp   # ← NEW
+    from .routes.reports     import reports_bp
 
     app.register_blueprint(auth_bp,        url_prefix='/api/mobile/auth')
     app.register_blueprint(news_bp,        url_prefix='/api/mobile/news')
@@ -57,11 +59,11 @@ def create_app(config_class=Config):
     app.register_blueprint(chat_bp,        url_prefix='/api/mobile/chat')
     app.register_blueprint(leaderboard_bp, url_prefix='/api/mobile/leaderboard')
     app.register_blueprint(students_bp,    url_prefix='/api/mobile/students')
-    app.register_blueprint(reports_bp,     url_prefix='/api/mobile/reports')  # ← NEW
+    app.register_blueprint(reports_bp,     url_prefix='/api/mobile/reports')
 
     # ── Register Socket.IO event handlers ─────────────────────────────────────
-    from .routes.chat_socket import register_socket_events  # ← NEW
-    register_socket_events(socketio)                        # ← NEW
+    from .routes.chat_socket import register_socket_events
+    register_socket_events(socketio)
 
     # ── Health check ──────────────────────────────────────────────────────────
     @app.route('/api/mobile/ping')
