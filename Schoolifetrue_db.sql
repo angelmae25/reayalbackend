@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS organizations (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS org_roles (
+CREATE TABLE IF NOT EXISTS or role_assignment (
   id INT AUTO_INCREMENT PRIMARY KEY,
   organization_id INT NOT NULL,
   student_id INT NOT NULL,
