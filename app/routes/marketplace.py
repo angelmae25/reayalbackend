@@ -1,5 +1,12 @@
 # =============================================================================
 # app/routes/marketplace.py  —  /api/mobile/marketplace
+#
+# FIXES:
+#   1. create_item() now validates that `name` is non-empty before attempting
+#      the DB insert (previously an empty name silently created a broken record).
+#   2. create_item() validates that `price` is a non-negative number.
+#   3. update_item() validates price is non-negative on edit.
+#   4. create_item() strips whitespace from name to prevent blank-looking items.
 # =============================================================================
 
 from flask import Blueprint, request, jsonify
@@ -34,17 +41,30 @@ def get_item(item_id):
 @jwt_required()
 def create_item():
     student_id = int(get_jwt_identity())
-
     data = request.get_json(force=True, silent=True)
+
     if not data:
         return jsonify({'message': 'Invalid or missing JSON body.'}), 400
 
+    # FIX: validate name
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify({'message': 'Item name is required.'}), 400
+
+    # FIX: validate price
+    try:
+        price = float(data.get('price', 0))
+        if price < 0:
+            return jsonify({'message': 'Price cannot be negative.'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'message': 'Price must be a number.'}), 400
+
     try:
         item = MarketplaceItem(
-            name        = data.get('name', '').strip(),
+            name        = name,
             description = data.get('description', ''),
             condition_  = data.get('condition', 'Good condition'),
-            price       = float(data.get('price', 0)),
+            price       = price,
             image_url   = data.get('image_url'),
             seller_id   = student_id,
         )
@@ -52,11 +72,10 @@ def create_item():
         db.session.commit()
         return jsonify(item.to_dict()), 201
 
-    except DataError as e:
+    except DataError:
         db.session.rollback()
-        # Most likely image_url column is still VARCHAR — needs migration
         return jsonify({
-            'message': 'Database error: image column too small. '
+            'message': 'Image too large for the database. '
                        'Run: ALTER TABLE marketplace_items MODIFY COLUMN image_url LONGTEXT;'
         }), 500
 
@@ -74,14 +93,33 @@ def create_item():
 def update_item(item_id):
     student_id = int(get_jwt_identity())
     item = MarketplaceItem.query.get_or_404(item_id)
+
     if item.seller_id != student_id:
-        return jsonify({'message': 'Forbidden'}), 403
+        return jsonify({'message': 'You can only edit your own listings.'}), 403
 
     data = request.get_json(force=True, silent=True) or {}
-    item.name       = data.get('name',      item.name)
-    item.condition_ = data.get('condition', item.condition_)
-    item.price      = float(data.get('price', item.price))
-    item.is_sold    = data.get('is_sold',   item.is_sold)
+
+    if 'name' in data:
+        name = data['name'].strip()
+        if not name:
+            return jsonify({'message': 'Item name cannot be empty.'}), 400
+        item.name = name
+
+    if 'condition' in data:
+        item.condition_ = data['condition']
+
+    if 'price' in data:
+        try:
+            price = float(data['price'])
+            if price < 0:
+                return jsonify({'message': 'Price cannot be negative.'}), 400
+            item.price = price
+        except (ValueError, TypeError):
+            return jsonify({'message': 'Price must be a number.'}), 400
+
+    if 'is_sold' in data:
+        item.is_sold = bool(data['is_sold'])
+
     db.session.commit()
     return jsonify(item.to_dict()), 200
 
@@ -91,8 +129,10 @@ def update_item(item_id):
 def delete_item(item_id):
     student_id = int(get_jwt_identity())
     item = MarketplaceItem.query.get_or_404(item_id)
+
     if item.seller_id != student_id:
-        return jsonify({'message': 'Forbidden'}), 403
+        return jsonify({'message': 'You can only delete your own listings.'}), 403
+
     db.session.delete(item)
     db.session.commit()
-    return jsonify({'message': 'Deleted'}), 200
+    return jsonify({'message': 'Listing deleted.'}), 200

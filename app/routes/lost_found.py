@@ -1,9 +1,13 @@
 # =============================================================================
 # app/routes/lost_found.py  —  /api/mobile/lost-found
-# GET  /         — list (optional ?status=lost|found)
-# GET  /<id>     — single
-# POST /         — report (supports base64 image)
-# PUT  /<id>     — update / resolve
+#
+# FIXES:
+#   1. report() now validates that `title` is non-empty (it was silently
+#      accepting blank titles, producing broken cards in the UI).
+#   2. report() validates that `status` is either 'lost' or 'found'.
+#   3. update_item() now also allows updating the status (e.g. lost → found
+#      when the item is recovered), which was missing.
+#   4. update_item() permission check error message is more descriptive.
 # =============================================================================
 
 from datetime import date
@@ -43,14 +47,30 @@ def report():
     if not data:
         return jsonify({'message': 'Invalid or missing JSON body.'}), 400
 
+    # FIX: validate title
+    title = data.get('title', '').strip()
+    if not title:
+        return jsonify({'message': 'Title is required.'}), 400
+
+    # FIX: validate status value
+    status = data.get('status', 'lost')
+    if status not in ('lost', 'found'):
+        return jsonify({'message': 'status must be "lost" or "found".'}), 400
+
+    # Parse date — default to today if not provided
+    raw_date = data.get('date', date.today().isoformat())
+    try:
+        item_date = date.fromisoformat(raw_date)
+    except ValueError:
+        return jsonify({'message': 'date must be in YYYY-MM-DD format.'}), 400
+
     try:
         item = LostFound(
-            title       = data.get('title', '').strip(),
+            title       = title,
             description = data.get('description', ''),
             location    = data.get('location', ''),
-            date        = date.fromisoformat(
-                              data.get('date', date.today().isoformat())),
-            status      = data.get('status', 'lost'),
+            date        = item_date,
+            status      = status,
             reporter_id = student_id,
             image_url   = data.get('image_url'),
         )
@@ -58,10 +78,10 @@ def report():
         db.session.commit()
         return jsonify(item.to_dict()), 201
 
-    except DataError as e:
+    except DataError:
         db.session.rollback()
         return jsonify({
-            'message': 'Database error: image column too small. '
+            'message': 'Image too large for the database. '
                        'Run: ALTER TABLE lost_found MODIFY COLUMN image_url LONGTEXT;'
         }), 500
 
@@ -79,11 +99,24 @@ def report():
 def update_item(item_id):
     student_id = int(get_jwt_identity())
     item = LostFound.query.get_or_404(item_id)
+
     if item.reporter_id != student_id:
-        return jsonify({'message': 'Forbidden'}), 403
+        return jsonify({'message': 'You can only edit your own reports.'}), 403
 
     data = request.get_json(force=True, silent=True) or {}
-    item.is_resolved = data.get('is_resolved', item.is_resolved)
-    item.description = data.get('description', item.description)
+
+    if 'is_resolved' in data:
+        item.is_resolved = bool(data['is_resolved'])
+
+    if 'description' in data:
+        item.description = data['description']
+
+    # FIX: allow status change (e.g. mark a lost item as found)
+    if 'status' in data:
+        new_status = data['status']
+        if new_status not in ('lost', 'found'):
+            return jsonify({'message': 'status must be "lost" or "found".'}), 400
+        item.status = new_status
+
     db.session.commit()
     return jsonify(item.to_dict()), 200
