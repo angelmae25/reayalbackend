@@ -118,11 +118,14 @@ def attend_event(event_id):
                     'points': student.points, 'event_name': event.full_name, 'already_attended': False}), 201
 
 
-@events_bp.route('/<int:event_id>/attendance', methods=['GET'])
+# Change /attendance to /attended
+@events_bp.route('/<int:event_id>/attended', methods=['GET'])
 @jwt_required()
 def check_attendance(event_id):
     student_id = int(get_jwt_identity())
-    attended = EventAttendance.query.filter_by(event_id=event_id, student_id=student_id).first() is not None
+    attended = EventAttendance.query.filter_by(
+        event_id=event_id, student_id=student_id
+    ).first() is not None
     return jsonify({'attended': attended}), 200
 
 

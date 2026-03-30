@@ -48,6 +48,7 @@ def create_app(config_class=Config):
     from .routes.leaderboard import leaderboard_bp
     from .routes.students    import students_bp
     from .routes.reports     import reports_bp
+    from .routes.org_post    import org_posts_bp
 
     app.register_blueprint(auth_bp,        url_prefix='/api/mobile/auth')
     app.register_blueprint(news_bp,        url_prefix='/api/mobile/news')
@@ -59,6 +60,7 @@ def create_app(config_class=Config):
     app.register_blueprint(leaderboard_bp, url_prefix='/api/mobile/leaderboard')
     app.register_blueprint(students_bp,    url_prefix='/api/mobile/students')
     app.register_blueprint(reports_bp,     url_prefix='/api/mobile/reports')
+    app.register_blueprint(org_posts_bp, url_prefix='/api/mobile')
 
     # ── Register Socket.IO event handlers ────────────────────────────────────
     from .routes.chat_socket import register_socket_events

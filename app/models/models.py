@@ -57,12 +57,19 @@ class RoleAssignment(db.Model):
     id              = db.Column(db.Integer,  primary_key=True)
     organization_id = db.Column(db.Integer,  db.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=False)
     student_id      = db.Column(db.Integer,  db.ForeignKey('students.id',      ondelete='CASCADE'), nullable=False)
-    role_name       = db.Column(db.String(60), nullable=False)
-    assigned_at     = db.Column(db.DateTime, default=datetime.utcnow)
-    assigned_by     = db.Column(db.Integer,  nullable=True)   # FK to admin users (optional check)
+    role_id         = db.Column(db.Integer,  db.ForeignKey('roles.id'),         nullable=False)
+    assigned_by     = db.Column(db.Integer,  nullable=True)
+    effective_date  = db.Column(db.Date,     nullable=True)
+    term_end        = db.Column(db.Date,     nullable=True)
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
     organization = db.relationship('Organization', backref='assignments', lazy='joined')
+    role         = db.relationship('Role',         lazy='joined')
+
+    @property
+    def role_name(self):
+        return self.role.role_name if self.role else ''
 
     def to_dict(self):
         return {
@@ -104,6 +111,7 @@ class Student(db.Model):
     fcm_token     = db.Column(db.String(500), nullable=True)
     created_at    = db.Column(db.DateTime,    default=datetime.utcnow)
     updated_at    = db.Column(db.DateTime,    default=datetime.utcnow, onupdate=datetime.utcnow)
+    department = db.Column(db.String(100), default='')
 
     # Relationships — defined here inside the class so to_dict() always works
     memberships       = db.relationship('Club', secondary=club_memberships,
