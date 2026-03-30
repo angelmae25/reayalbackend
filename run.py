@@ -13,14 +13,12 @@
 # Physical device connects via:   http://<YOUR_PC_LAN_IP>:5000/api/mobile/...
 # =============================================================================
 
-from app import create_app, db, socketio   # ← FIX: import socketio here, not inside block
+from app import create_app, db, socketio
 
 app = create_app()
 
 if __name__ == '__main__':
     with app.app_context():
-        # Creates all tables if they don't exist yet.
-        # (If you already ran Schoolifetrue_db.sql manually, this is a no-op.)
         db.create_all()
         print("✅  Database tables ready.")
 

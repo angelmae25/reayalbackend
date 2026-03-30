@@ -11,7 +11,7 @@ class Config:
     # Edit DB_USER / DB_PASS / DB_HOST to match your MySQL setup in PyCharm.
     # PyCharm typically runs MySQL on localhost:3306.
     DB_USER = os.environ.get('DB_USER',  'root')
-    DB_PASS = os.environ.get('DB_PASS',  'admin1234')        # ← change to your MySQL password
+    DB_PASS = os.environ.get('DB_PASS',  '12345')        # ← change to your MySQL password
     DB_HOST = os.environ.get('DB_HOST',  'localhost')
     DB_PORT = os.environ.get('DB_PORT',  '3306')
     DB_NAME = os.environ.get('DB_NAME',  'Schoolifetrue_db')

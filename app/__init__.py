@@ -14,22 +14,21 @@ from .config import Config
 db       = SQLAlchemy()
 bcrypt   = Bcrypt()
 jwt      = JWTManager()
-# SocketIO without specifying async_mode for compatibility with Python 3.14
-socketio = SocketIO(cors_allowed_origins="*")
+socketio = SocketIO(cors_allowed_origins="*", async_mode='threading')
 
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
-    # ── Initialize extensions ───────────────────────────────────────────────────
+    # ── Initialize extensions ─────────────────────────────────────────────────
     db.init_app(app)
     bcrypt.init_app(app)
     jwt.init_app(app)
-    socketio.init_app(app)
+    socketio.init_app(app, async_mode='threading')
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-    # ── Global error handlers ──────────────────────────────────────────────────
+    # ── Global error handlers ─────────────────────────────────────────────────
     @app.errorhandler(413)
     def too_large(e):
         return jsonify({'message': 'Image is too large. Please use a smaller photo (max 10 MB).'}), 413
@@ -61,7 +60,7 @@ def create_app(config_class=Config):
     app.register_blueprint(students_bp,    url_prefix='/api/mobile/students')
     app.register_blueprint(reports_bp,     url_prefix='/api/mobile/reports')
 
-    # ── Register Socket.IO event handlers ─────────────────────────────────────
+    # ── Register Socket.IO event handlers ────────────────────────────────────
     from .routes.chat_socket import register_socket_events
     register_socket_events(socketio)
 
